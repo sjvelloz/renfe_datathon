@@ -82,8 +82,8 @@ Managing real-time urban rail transit systems (such as Cercanías Renfe) involve
 Connect to your IBM Z / LinuxONE instance via SSH and clone the repository:
 
 ```bash
-git clone https://github.com/YOUR_TEAM/RailOps.git
-cd RailOps
+git clone https://github.com/sjvelloz/renfe_datathon
+cd renfe_datathon
 pip install --user -r requirements.txt
 ```
 
