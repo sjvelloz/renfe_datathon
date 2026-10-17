@@ -1,0 +1,36 @@
+# --- ENTORNOS VIRTUALES Y CACHÉ ---
+.venv/
+venv_railops/
+miniconda3/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- BASE DE DATOS Y DATOS TEMPORALES ---
+enlace_datos/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- ARCHIVOS DE SALIDA, LOGS Y EJECUCIÓN ---
+*.log
+*.out
+recolector.out
+streamlit.out
+
+# --- MODELOS DE IA / MACHINE LEARNING ---
+# (Ruta o extensiones de tus modelos)
+models/
+modelos/
+*.bin
+*.pkl
+*.onnx
+*.h5
+*.pt
+*.safetensors
+
+# --- CONFIGURACIÓN LOCAL Y SECRETOS ---
+.env
+.DS_Store
+.vscode/
+.idea/

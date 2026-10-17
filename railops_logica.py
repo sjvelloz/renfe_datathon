@@ -11,35 +11,43 @@ def conectar(db=DB):
     return con
 
 def desde(minutos):
-    return f"strftime('%Y-%m-%dT%H:%M:%S','now','-{int(minutos)} minutes')"
+    # Usa la última captura real de la base de datos para evitar desajustes horarios (UTC/CEST)
+    return f"datetime((SELECT MAX(captura_utc) FROM capturas), '-{int(minutos)} minutes')"
 
 def zonas_por_linea(con, minutos=15):
     sql = f"""
     WITH ult AS (
-      SELECT trip_id, route_id_gtfs, retraso_viaje_s AS d, relacion_viaje, MAX(captura_id)
-      FROM obs_actualizacion WHERE captura_utc >= {desde(minutos)}
-      GROUP BY trip_id)
+      SELECT trip_id, route_id_gtfs, retraso_viaje_s AS d, relacion_viaje
+      FROM obs_actualizacion 
+      WHERE captura_utc >= {desde(minutos)}
+      GROUP BY trip_id
+    )
     SELECT r.route_id, r.route_short_name AS linea, COUNT(*) AS viajes,
-           SUM(d >= 300) AS con_retraso_5min,
-           SUM(relacion_viaje = 'CANCELED') AS cancelados,
-           ROUND(AVG(d)/60.0, 1) AS retraso_medio_min,
-           MAX(d) AS retraso_max_s
-    FROM ult JOIN gtfs_routes r ON r.route_id = ult.route_id_gtfs
-    GROUP BY r.route_id ORDER BY con_retraso_5min DESC"""
+           SUM(COALESCE(d, 0) >= 300) AS con_retraso_5min,
+           SUM(COALESCE(relacion_viaje, '') = 'CANCELED') AS cancelados,
+           ROUND(AVG(COALESCE(d, 0))/60.0, 1) AS retraso_medio_min,
+           MAX(COALESCE(d, 0)) AS retraso_max_s
+    FROM ult 
+    JOIN gtfs_routes r ON r.route_id = ult.route_id_gtfs
+    GROUP BY r.route_id, r.route_short_name 
+    ORDER BY con_retraso_5min DESC"""
     return [dict(x) for x in con.execute(sql)]
 
 def zonas_por_estacion(con, minutos=15):
     sql = f"""
     WITH ult AS (
-      SELECT trip_id, stop_id, retraso_viaje_s AS d, relacion_parada, MAX(captura_id)
+      SELECT trip_id, stop_id, retraso_viaje_s AS d, relacion_parada
       FROM obs_actualizacion
       WHERE captura_utc >= {desde(minutos)} AND stop_id IS NOT NULL
-      GROUP BY trip_id, stop_id)
+      GROUP BY trip_id, stop_id
+    )
     SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon, COUNT(*) AS viajes,
-           SUM(d >= 300) AS con_retraso_5min,
+           SUM(COALESCE(d, 0) >= 300) AS con_retraso_5min,
            SUM(COALESCE(relacion_parada,'') = 'SKIPPED') AS paradas_omitidas
-    FROM ult JOIN gtfs_stops s ON s.stop_id = ult.stop_id
-    GROUP BY s.stop_id ORDER BY con_retraso_5min DESC"""
+    FROM ult 
+    JOIN gtfs_stops s ON s.stop_id = ult.stop_id
+    GROUP BY s.stop_id, s.stop_name, s.stop_lat, s.stop_lon 
+    ORDER BY con_retraso_5min DESC"""
     return [dict(x) for x in con.execute(sql)]
 
 def evolucion_viaje(con, trip_id):
@@ -70,9 +78,6 @@ def avisos_de_linea(con, route_id, minutos=15):
         if any(e.get("routeId") == route_id for e in ents):
             out.append({"id": a["aviso_id"], "texto": a["descripcion"] or a["cabecera"]})
     return out
-
-
-
 
 def resumen_para_granite(con, route_id, minutos=15):
     linea = next((z for z in zonas_por_linea(con, minutos) if z["route_id"] == route_id), None)

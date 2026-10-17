@@ -1,4 +1,5 @@
 import json
+import html
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -205,7 +206,39 @@ with izq:
     if not zonas:
         st.info("No hay líneas con datos relacionables en esta ventana.")
     else:
-        st.dataframe(zonas[:10], use_container_width=True)
+        # Evita la tabla Arrow: los datos originales se conservan para informes.
+        columnas = [
+            ("linea", "Línea"),
+            ("viajes", "Viajes"),
+            ("con_retraso_5min", "Retraso ≥5 min"),
+            ("cancelados", "Cancelados"),
+            ("retraso_medio_min", "Media (min)"),
+            ("retraso_max_s", "Máximo (s)"),
+        ]
+
+        def celda_tabla(valor):
+            if valor is None:
+                return "—"
+            return html.escape(str(valor))
+
+        cabecera = "".join(
+            "<th>" + html.escape(titulo) + "</th>"
+            for _, titulo in columnas
+        )
+        cuerpo = "".join(
+            "<tr>" + "".join(
+                "<td>" + celda_tabla(zona.get(clave)) + "</td>"
+                for clave, _ in columnas
+            ) + "</tr>"
+            for zona in zonas[:10]
+        )
+        st.markdown(
+            '<div style="overflow-x:auto">'
+            '<table style="width:100%;border-collapse:collapse">'
+            '<thead><tr>' + cabecera + '</tr></thead>'
+            '<tbody>' + cuerpo + '</tbody></table></div>',
+            unsafe_allow_html=True,
+        )
 
         opciones = {
             f"{zona['linea']} ({zona['route_id']})":
@@ -284,3 +317,4 @@ with der:
         "La antigüedad individual corresponde a la posición, "
         "no necesariamente al retraso publicado."
     )
+
