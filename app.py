@@ -144,3 +144,143 @@ for nombre, edad in (
         st.warning(
             f"El {nombre} tiene más de 2 minutos de antigüedad."
         )
+
+# Recalculamos la antigüedad individual de las posiciones.
+# No modificamos el archivo ni la base de datos.
+trenes_mapa = []
+
+for tren in estado.get("trenes", []):
+    copia = dict(tren)
+
+    edad = edad_segundos(
+        tren.get("posicion_utc"),
+        ahora,
+    )
+
+    copia["antiguedad_s"] = (
+        int(edad)
+        if edad is not None and edad >= 0
+        else None
+    )
+
+    # Si no podemos confirmar frescura general, los puntos
+    # no deben aparecer como posiciones frescas.
+    if (
+        edad_posiciones is None
+        or edad_posiciones < 0
+        or edad_posiciones > 120
+        or edad_archivo is None
+        or edad_archivo < 0
+        or edad_archivo > 120
+    ):
+        copia["antiguedad_s"] = None
+
+    trenes_mapa.append(copia)
+
+estado_mapa = {
+    **estado,
+    "trenes": trenes_mapa,
+}
+
+
+# Cerramos siempre la conexión después de cada consulta.
+try:
+    con = L.conectar(str(DATOS / "enlace.db"))
+
+    try:
+        zonas = L.zonas_por_linea(con, 15)
+    finally:
+        con.close()
+
+except Exception as error:
+    st.error(f"No se pueden consultar las métricas: {error}")
+    st.stop()
+
+
+izq, der = st.columns([1, 2])
+
+with izq:
+    st.subheader("Líneas · últimos 15 minutos")
+
+    if not zonas:
+        st.info("No hay líneas con datos relacionables en esta ventana.")
+    else:
+        st.dataframe(zonas[:10], use_container_width=True)
+
+        opciones = {
+            f"{zona['linea']} ({zona['route_id']})":
+                zona["route_id"]
+            for zona in zonas
+        }
+
+        elegida = st.selectbox(
+            "Analizar línea",
+            list(opciones),
+            key="selector_linea",
+        )
+
+        route_id = opciones[elegida]
+
+        if st.button("Generar informe", key="generar_informe"):
+            try:
+                con = L.conectar(str(DATOS / "enlace.db"))
+
+                try:
+                    resumen = L.resumen_para_granite(
+                        con,
+                        route_id,
+                        15,
+                    )
+                finally:
+                    con.close()
+
+                if resumen is None:
+                    st.warning("No hay datos para generar el informe.")
+                else:
+                    with st.spinner("Generando informe…"):
+                        texto, origen = informe(resumen)
+
+                    st.session_state["ultimo_informe"] = {
+                        "route_id": route_id,
+                        "texto": texto,
+                        "origen": origen,
+                        "datos": resumen,
+                        "generado_utc": datetime.now(
+                            timezone.utc
+                        ).isoformat(),
+                    }
+
+            except Exception as error:
+                st.error(f"No se pudo generar el informe: {error}")
+
+        guardado = st.session_state.get("ultimo_informe")
+
+        if guardado and guardado["route_id"] == route_id:
+            st.subheader("Informe")
+            st.info(guardado["texto"])
+            st.caption(
+                f"Origen: {guardado['origen']} · "
+                f"Generado: {guardado['generado_utc']} · "
+                "No se regenera al actualizar los datos."
+            )
+
+            with st.expander("Ver datos utilizados en el informe"):
+                st.json(guardado["datos"])
+
+
+with der:
+    st.subheader("Posiciones observadas")
+
+    st_folium(
+        construir_mapa(estado_mapa, estaciones),
+        height=650,
+        use_container_width=True,
+        key="railops_mapa_principal",
+        returned_objects=[],
+    )
+
+    st.caption(
+        "El selector de línea todavía no filtra este mapa. "
+        "La antigüedad individual corresponde a la posición, "
+        "no necesariamente al retraso publicado."
+    )
