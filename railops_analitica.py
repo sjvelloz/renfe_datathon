@@ -272,10 +272,10 @@ def clasificar(prev, act, minimo):
         return "alta", "Prioridad alta"
     if cambio >= 5:
         return "media", "Prioridad media"
-    if act["pct_5"] >= 30:
-        return "media", "Nivel alto sostenido"
     if cambio <= -5:
         return "mejora", "Mejora"
+    if act["pct_5"] >= 30:
+        return "media", "Nivel alto sostenido"
     return "estable", "Estable"
 
 
