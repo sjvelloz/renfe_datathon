@@ -70,3 +70,28 @@ def avisos_de_linea(con, route_id, minutos=15):
         if any(e.get("routeId") == route_id for e in ents):
             out.append({"id": a["aviso_id"], "texto": a["descripcion"] or a["cabecera"]})
     return out
+
+
+
+
+def resumen_para_granite(con, route_id, minutos=15):
+    linea = next((z for z in zonas_por_linea(con, minutos) if z["route_id"] == route_id), None)
+    if linea is None:
+        return None
+    emp = empeorados(con, route_id, minutos)
+    return {
+        "ambito": "linea", "route_id": route_id, "linea": linea["linea"],
+        "ventana_min": minutos,
+        "viajes_observados": linea["viajes"],
+        "viajes_retraso_5min": linea["con_retraso_5min"],
+        "viajes_empeorados_1min": len(emp),
+        "cancelados": linea["cancelados"],
+        "retraso_medio_min": linea["retraso_medio_min"],
+        "retraso_max_min": round((linea["retraso_max_s"] or 0) / 60, 1),
+        "umbral_retraso_min": 5,
+        "umbral_empeora_min": 1,
+        "n_avisos": len(avisos_de_linea(con, route_id, minutos)),
+        "avisos": avisos_de_linea(con, route_id, minutos)[:3],
+        "fuente": "Renfe GTFS-RT (retrasos publicados, no medidos)",
+    }
+
