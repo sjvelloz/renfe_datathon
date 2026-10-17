@@ -31,3 +31,32 @@ def construir_mapa(estado, estaciones, centro=(40.4168, -3.7038), zoom=10):
                    f'Próxima: {t["proxima_parada_nombre"]}<br>Dato de hace {t["antiguedad_s"]} s'),
         ).add_to(m)
     return m
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    base = Path(__file__).resolve().parent
+
+    with open(
+        base / "enlace_datos" / "salida" / "estado_actual.json",
+        encoding="utf-8",
+    ) as archivo:
+        estado = json.load(archivo)
+
+    with open(
+        base / "enlace_datos" / "salida" / "estaciones.geojson",
+        encoding="utf-8",
+    ) as archivo:
+        estaciones = json.load(archivo)
+
+    print(
+        f"Construyendo mapa: {len(estado['trenes'])} trenes y "
+        f"{len(estaciones['features'])} estaciones...",
+        flush=True,
+    )
+
+    salida = base / "mapa_prueba.html"
+    construir_mapa(estado, estaciones).save(str(salida))
+
+    print(f"Mapa guardado en: {salida}", flush=True)
